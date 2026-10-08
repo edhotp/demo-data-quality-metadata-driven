@@ -66,7 +66,7 @@ def find(items, name):
 
 
 # ---------- 1. .py (percent format) -> .ipynb ----------
-def py_to_ipynb(src: Path, ws_id: str, lh_id: str) -> dict:
+def py_to_ipynb(src: Path, ws_id: str | None = None, lh_id: str | None = None) -> dict:
     cells, cur, kind = [], [], None
 
     def flush():
@@ -94,16 +94,25 @@ def py_to_ipynb(src: Path, ws_id: str, lh_id: str) -> dict:
         else:
             cur.append(line)
     flush()
-    return {
-        "nbformat": 4, "nbformat_minor": 5, "cells": cells,
-        "metadata": {
-            "language_info": {"name": "python"},
-            "kernel_info": {"name": "synapse_pyspark"},
-            "kernelspec": {"name": "synapse_pyspark", "display_name": "Synapse PySpark", "language": "Python"},
-            "dependencies": {"lakehouse": {"default_lakehouse": lh_id, "default_lakehouse_name": LAKEHOUSE_NAME,
-                                           "default_lakehouse_workspace_id": ws_id}},
-        },
+    metadata = {
+        "language_info": {"name": "python"},
+        "kernel_info": {"name": "synapse_pyspark"},
+        "kernelspec": {"name": "synapse_pyspark", "display_name": "Synapse PySpark", "language": "Python"},
     }
+    # Binding default lakehouse hanya untuk notebook yang di-deploy. File .ipynb di repo sengaja TANPA binding,
+    # agar notebook hasil import manual tidak diam-diam menulis ke lakehouse workspace lain.
+    if ws_id and lh_id:
+        metadata["dependencies"] = {"lakehouse": {"default_lakehouse": lh_id, "default_lakehouse_name": LAKEHOUSE_NAME,
+                                                  "default_lakehouse_workspace_id": ws_id}}
+    return {"nbformat": 4, "nbformat_minor": 5, "cells": cells, "metadata": metadata}
+
+
+def export_notebooks():
+    """Tulis notebooks/*.ipynb (tanpa binding lakehouse) dari source notebooks/*.py."""
+    for nb in NOTEBOOKS:
+        ipynb = py_to_ipynb(ROOT / "notebooks" / f"{nb}.py")
+        (ROOT / "notebooks" / f"{nb}.ipynb").write_text(json.dumps(ipynb, indent=1, ensure_ascii=False) + "\n",
+                                                        encoding="utf-8")
 
 
 def b64(obj) -> str:
@@ -151,11 +160,11 @@ def main():
         upload_onelake(ws_id, lh_id, ROOT / "data" / f, f"landing/{f}")
 
     print("[2] Notebooks")
+    export_notebooks()
     existing = call("GET", f"{API}/workspaces/{ws_id}/items")["value"]
     nb_ids = {}
     for nb in NOTEBOOKS:
-        ipynb = py_to_ipynb(ROOT / "notebooks" / f"{nb}.py", ws_id, lh_id)
-        (ROOT / "notebooks" / f"{nb}.ipynb").write_text(json.dumps(ipynb, indent=1, ensure_ascii=False), encoding="utf-8")
+        ipynb = py_to_ipynb(ROOT / "notebooks" / f"{nb}.py", ws_id, lh_id)  # versi deploy: ter-attach ke lakehouse tujuan
         nb_ids[nb] = upsert_item(ws_id, existing, nb, "Notebook",
                                  [{"path": "notebook-content.ipynb", "payload": b64(ipynb), "payloadType": "InlineBase64"}])
 

@@ -71,7 +71,7 @@ def container(title=None, bg=WHITE):
     return vco
 
 
-def visual(page, key, vtype, pos, roles=None, objects=None, vco=None, sort=None):
+def visual(page, key, vtype, pos, roles=None, objects=None, vco=None, sort=None, filters=None):
     x, y, w, h = pos
     v = {"visualType": vtype}
     if roles:
@@ -84,11 +84,32 @@ def visual(page, key, vtype, pos, roles=None, objects=None, vco=None, sort=None)
         v["visualContainerObjects"] = vco
     name = uid(page, key)
     z = 1000 + len(PAGES[page]["visuals"]) * 1000
-    PAGES[page]["visuals"].append({
+    container_json = {
         "$schema": VC_SCHEMA, "name": name,
         "position": {"x": x, "y": y, "z": z, "height": h, "width": w, "tabOrder": z},
         "visual": v,
-    })
+    }
+    if filters:
+        container_json["filterConfig"] = {"filters": filters}
+    PAGES[page]["visuals"].append(container_json)
+
+
+def not_blank_filter(page, key, entity, prop):
+    """Visual filter 'bukan (Blank)'. Direct Lake selalu menyertakan baris blank di tabel dimensi,
+    sehingga tanpa filter ini slicer akan menampilkan opsi '(Blank)'."""
+    return {
+        "name": "Filter" + hashlib.sha1(f"{page}|{key}|notblank".encode()).hexdigest()[:24],
+        "field": field(entity, prop),
+        "type": "Categorical",
+        "filter": {
+            "Version": 2,
+            "From": [{"Name": "t", "Entity": entity, "Type": 0}],
+            "Where": [{"Condition": {"Not": {"Expression": {"In": {
+                "Expressions": [{"Column": {"Expression": {"SourceRef": {"Source": "t"}}, "Property": prop}}],
+                "Values": [[{"Literal": {"Value": "null"}}]]}}}}}],
+        },
+        "howCreated": "User",
+    }
 
 
 def textbox(page, key, pos, text, size="20px", bold=True, col=NAVY):
@@ -103,6 +124,7 @@ def textbox(page, key, pos, text, size="20px", bold=True, col=NAVY):
 
 def slicer(page, key, pos, entity, prop, header):
     visual(page, key, "slicer", pos, roles={"Values": [C(entity, prop)]},
+           filters=[not_blank_filter(page, key, entity, prop)],
            objects={"data": [{"properties": {"mode": lit("'Dropdown'")}}],
                     "header": [{"properties": {"show": lit("true"), "text": lit(f"'{header}'")}}]},
            vco={"background": [{"properties": {"show": lit("true"), "color": color(WHITE)}}],

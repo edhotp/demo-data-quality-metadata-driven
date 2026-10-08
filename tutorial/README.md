@@ -138,7 +138,7 @@ Buka dua file di folder [data/](../data/):
 | Sheet | Baris | Error yang **sengaja** disisipkan |
 |---|---|---|
 | `Customer` | 1.000 | 4 Customer_ID kosong, 12 email salah format, 60 nomor HP salah format |
-| `Sales` | 5.000 | 6 Transaction_ID duplikat, 125 Amount negatif, 5 Quantity = 0, 8 Customer_ID tidak terdaftar, 2 tanggal di masa depan |
+| `Sales` | 5.000 | 3 Transaction_ID duplikat (6 baris), 125 Amount negatif, 5 Quantity = 0, 8 Customer_ID tidak terdaftar, 2 tanggal di masa depan |
 | `Product` | 200 | 1 Category tidak valid (`X`), 2 harga = 0 |
 | `Inventory` | 600 | 5 stok negatif, 2 Product_ID kosong |
 
@@ -201,7 +201,10 @@ Lanjut ke [Langkah 4](#langkah-4---jalankan-pipeline-dan-pahami-cara-kerja-engin
 
 1. Kembali ke workspace → **Import** → **Notebook** → **From this computer**.
 2. Pilih keempat file `.ipynb` di folder [notebooks/](../notebooks/). Nama notebook **jangan diubah**, karena notebook 04 memanggil `02_DQ_Engine` dan `03_Gold_DQ_Dashboard` berdasarkan nama.
-3. Buka setiap notebook → panel **Explorer** → **Lakehouses**. Jika lakehouse belum terpasang (atau menunjuk ke lakehouse lain), hapus lalu **Add** → **Existing lakehouse** → pilih `lh_metadata_dq`. Ulangi untuk keempat notebook.
+3. **Wajib:** buka setiap notebook → panel **Explorer** → **Lakehouses** → **Add** → **Existing lakehouse** → pilih `lh_metadata_dq` **di workspace Anda** → **Add**. Ulangi untuk keempat notebook. File `.ipynb` di repo sengaja tidak membawa lakehouse, sehingga tanpa langkah ini notebook akan gagal dijalankan (karena tidak ada default lakehouse) dan tidak menulis data ke mana pun.
+
+> [!WARNING]
+> Jika di tenant yang sama ada beberapa lakehouse bernama `lh_metadata_dq` (misalnya milik rekan Anda), pastikan yang dipilih adalah lakehouse di **workspace Anda sendiri**. Jika salah pilih, notebook akan menulis ke lakehouse workspace lain, sementara lakehouse Anda tetap kosong.
 
 **3.3 Buat Data Pipeline**
 
@@ -385,7 +388,7 @@ Hal yang perlu dipahami dari semantic model:
 | `DQ Run` | `dq.dq_run_history` | Dimensi eksekusi (slicer *Run ID*) |
 | `DQ Rule` | `meta.dq_rule_catalog` | Dimensi rule (Dataset, Severity, Owner, ...) |
 
-Semua measure memakai **run terakhir** secara default (atau run yang dipilih di slicer *Run ID*), sehingga angka beberapa run tidak ikut terjumlahkan. Contoh measure `DQ Score`:
+Semua measure memakai **run terakhir** secara default (atau run yang dipilih di slicer *Run ID*), sehingga angka beberapa run tidak ikut terjumlahkan. Selain itu, tabel dimensi pada model Direct Lake selalu memiliki baris *blank*. Karena itu, setiap slicer di report diberi filter visual "bukan (Blank)" agar opsi `(Blank)` tidak muncul. Contoh measure `DQ Score`:
 
 ```dax
 DQ Score =
@@ -433,6 +436,8 @@ RULE_LIBRARY["MAX_LENGTH"] = rule_max_length
 
 Lalu tambahkan rule di Excel, misalnya `DQ017 | Customer | Customer_Name | MAX_LENGTH | 20 | 100 | Low | ...`, dan jalankan ulang pipeline. Jika memakai Jalur A, ubah juga [notebooks/02_DQ_Engine.py](../notebooks/02_DQ_Engine.py) agar perubahan ikut ter-deploy.
 
+Hasil yang diharapkan: dengan parameter `20`, DQ017 **PASS** (nama terpanjang di data dummy 15 karakter). Ganti parameternya menjadi `12` untuk melihat **FAIL** (hanya ± 68% nama ≤ 12 karakter). Sekali lagi, cukup ubah metadata, tanpa mengubah kode.
+
 ### Latihan 3 - Tambah dataset baru
 
 1. Tambahkan sheet baru (misalnya `Supplier`) ke `source_data_dummy.xlsx`.
@@ -452,6 +457,7 @@ Lalu tambahkan rule di Excel, misalnya `DQ017 | Customer | Customer_Name | MAX_L
 | `setup_fabric.py`: *Workspace belum ada* | Tambahkan `--capacity "<nama>"`. Capacity harus berstatus **Active** (cek dengan `--list-capacities`). |
 | Notebook gagal: `Feature not supported ... CREATE SCHEMA` | Lakehouse dibuat **tanpa** Lakehouse schemas. Buat ulang lakehouse dengan schemas aktif. |
 | Notebook gagal: `Table or view not found: bronze.customer` | Notebook 01 belum dijalankan, atau notebook belum ter-*attach* ke `lh_metadata_dq` (lihat Langkah 3.2). |
+| Pipeline **Succeeded** tetapi lakehouse Anda tetap kosong | Notebook ter-*attach* ke lakehouse di workspace **lain** (nama sama, workspace beda), atau hasil import file `.ipynb` versi lama yang masih membawa binding. Buka setiap notebook → **Explorer** → **Lakehouses**, hapus lakehouse yang salah, lalu **Add** lakehouse di workspace Anda. Cara lain: jalankan `deploy_to_fabric.py` dengan `FABRIC_WORKSPACE` = workspace Anda, karena script selalu meng-*attach* lakehouse yang benar. |
 | Notebook gagal: `FileNotFoundError ... /lakehouse/default/Files/landing/...` | Excel belum di-upload ke `Files/landing/`, atau default lakehouse notebook salah. |
 | Pipeline/notebook lama di status *Queued* / gagal start Spark | Capacity sedang di-*pause* atau penuh. Resume capacity di Azure portal / Fabric admin portal. |
 | Notebook 04: `02_DQ_Engine` tidak ditemukan | Nama notebook diubah saat import. Kembalikan ke nama aslinya. |
