@@ -1,0 +1,79 @@
+/// Dimensi rule dari DQ Rule Catalog (metadata): 1 baris = 1 rule (sumber: meta.dq_rule_catalog).
+table 'DQ Rule'
+
+	/// Jumlah rule aktif (Is Active = Y) di DQ Rule Catalog.
+	measure 'Active Rules' = CALCULATE ( COUNTROWS ( 'DQ Rule' ), 'DQ Rule'[Is Active] = "Y" )
+		formatString: #,##0
+
+	/// Jumlah seluruh rule (aktif & non-aktif) di DQ Rule Catalog.
+	measure 'Total Rules' = COUNTROWS ( 'DQ Rule' )
+		formatString: #,##0
+
+	/// ID unik rule, juga dipakai sebagai Error Code pada record yang gagal.
+	column 'Rule ID'
+		dataType: string
+		isKey
+		summarizeBy: none
+		sourceColumn: Rule_ID
+
+	/// Dataset (tabel bronze) yang divalidasi rule ini, mis. Customer, Sales, Product, Inventory.
+	column Dataset
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Dataset
+
+	/// Nama kolom yang divalidasi.
+	column 'Column Name'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Column
+
+	/// Tipe rule: NOT_NULL, VALID_FORMAT, UNIQUE, RANGE, VALID_VALUE, REFERENTIAL, CUSTOM_SQL.
+	column 'Rule Type'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Rule_Type
+
+	/// Parameter rule (regex, min|max, daftar nilai, Dataset.Kolom, atau ekspresi SQL).
+	column 'Rule Parameter'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Rule_Parameter
+
+	/// Threshold saat ini di metadata (bisa berbeda dengan threshold saat run lama dijalankan).
+	column 'Catalog Threshold'
+		dataType: double
+		summarizeBy: none
+		sourceColumn: Threshold
+
+	/// High / Medium = blocking (record dikarantina, tidak masuk Silver); Low = warning.
+	column Severity
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Severity
+
+	/// Tim pemilik rule yang bertanggung jawab memperbaiki data.
+	column Owner
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Owner
+
+	/// Penjelasan rule, juga dipakai sebagai pesan error.
+	column 'Rule Description'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Description
+
+	/// Y = rule aktif dieksekusi engine, N = rule dinonaktifkan.
+	column 'Is Active'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Is_Active
+
+	partition 'DQ Rule' = entity
+		mode: directLake
+		source
+			entityName: dq_rule_catalog
+			schemaName: meta
+			expressionSource: 'DirectLake - lh_metadata_dq'
+

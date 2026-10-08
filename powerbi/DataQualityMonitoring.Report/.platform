@@ -1,0 +1,11 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "Report",
+    "displayName": "Data Quality Monitoring"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "839f0c64-47a6-41b7-9537-e69868607d6d"
+  }
+}

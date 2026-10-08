@@ -1,0 +1,48 @@
+/// Fakta record yang gagal validasi (Quarantine): 1 baris = 1 record x 1 rule yang gagal (sumber: dq.dq_error_records).
+table 'DQ Error Record'
+
+	/// Jumlah record gagal (quarantine) pada run terakhir.
+	measure 'Error Record Count' = ```
+			VAR _run = [Latest Run ID]
+			RETURN CALCULATE ( COUNTROWS ( 'DQ Error Record' ), 'DQ Run'[Run ID] = _run )
+			```
+		formatString: #,##0
+
+	/// Jumlah nilai unik yang gagal validasi pada run terakhir (membantu melihat pola error yang berulang).
+	measure 'Distinct Failed Values' = ```
+			VAR _run = [Latest Run ID]
+			RETURN CALCULATE ( DISTINCTCOUNT ( 'DQ Error Record'[Failed Value] ), 'DQ Run'[Run ID] = _run )
+			```
+		formatString: #,##0
+
+	column 'Run ID'
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Run_ID
+
+	column 'Rule ID'
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Error_Code
+
+	/// Nilai kolom yang gagal validasi (dalam bentuk teks; kosong = NULL).
+	column 'Failed Value'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Value
+
+	/// Isi lengkap record yang gagal dalam format JSON, untuk investigasi & perbaikan data.
+	column 'Record JSON'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Record
+
+	partition 'DQ Error Record' = entity
+		mode: directLake
+		source
+			entityName: dq_error_records
+			schemaName: dq
+			expressionSource: 'DirectLake - lh_metadata_dq'
+

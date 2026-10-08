@@ -1,0 +1,171 @@
+/// Fakta hasil validasi DQ: 1 baris = 1 rule pada 1 eksekusi (sumber: dq.dq_results).
+/// Semua measure default menampilkan run TERAKHIR pada filter context (atau run yang dipilih di slicer).
+table 'DQ Result'
+
+	/// Run ID terbaru pada filter context. Format RUN_yyyyMMdd_HHmmss sehingga MAX = run terakhir.
+	measure 'Latest Run ID' = MAX('DQ Run'[Run ID])
+		displayFolder: Run
+
+	/// DQ Score = rata-rata Pass % semua rule pada run terakhir. Pada level 1 rule = Pass % rule tersebut.
+	measure 'DQ Score' = ```
+			VAR _run = [Latest Run ID]
+			RETURN
+			    CALCULATE (
+			        DIVIDE ( AVERAGE ( 'DQ Result'[Pass Pct] ), 100 ),
+			        'DQ Run'[Run ID] = _run
+			    )
+			```
+		formatString: 0.00%
+		displayFolder: Score
+
+	/// Target DQ Score organisasi (95%). Dipakai sebagai garis target pada gauge.
+	measure 'DQ Score Target' = 0.95
+		formatString: 0.00%
+		displayFolder: Score
+
+	/// DQ Score pada run sebelum run terakhir (untuk melihat tren perbaikan kualitas data).
+	measure 'DQ Score Previous Run' = ```
+			VAR _run = [Latest Run ID]
+			VAR _prev =
+			    CALCULATE ( MAX ( 'DQ Run'[Run ID] ), REMOVEFILTERS ( 'DQ Run' ), 'DQ Run'[Run ID] < _run )
+			RETURN
+			    IF (
+			        NOT ISBLANK ( _prev ),
+			        CALCULATE (
+			            DIVIDE ( AVERAGE ( 'DQ Result'[Pass Pct] ), 100 ),
+			            REMOVEFILTERS ( 'DQ Run' ),
+			            'DQ Run'[Run ID] = _prev
+			        )
+			    )
+			```
+		formatString: 0.00%
+		displayFolder: Score
+
+	/// Selisih DQ Score run terakhir dibanding run sebelumnya (dalam poin persentase).
+	measure 'DQ Score Change' = ```
+			VAR _prev = [DQ Score Previous Run]
+			RETURN IF ( NOT ISBLANK ( _prev ), [DQ Score] - _prev )
+			```
+		formatString: +0.00%;-0.00%;0.00%
+		displayFolder: Score
+
+	/// Jumlah rule yang dieksekusi pada run terakhir.
+	measure 'Rules Executed' = ```
+			VAR _run = [Latest Run ID]
+			RETURN CALCULATE ( COUNTROWS ( 'DQ Result' ), 'DQ Run'[Run ID] = _run )
+			```
+		formatString: #,##0
+		displayFolder: Rule
+
+	/// Jumlah rule berstatus PASS (Pass % >= Threshold) pada run terakhir.
+	measure 'Rules Passed' = ```
+			VAR _run = [Latest Run ID]
+			VAR _passed =
+			    CALCULATE ( COUNTROWS ( 'DQ Result' ), 'DQ Run'[Run ID] = _run, 'DQ Result'[Status] = "PASS" )
+			RETURN IF ( [Rules Executed] > 0, _passed + 0 )
+			```
+		formatString: #,##0
+		displayFolder: Rule
+
+	/// Jumlah rule berstatus FAIL (Pass % < Threshold) pada run terakhir.
+	measure 'Rules Failed' = ```
+			VAR _run = [Latest Run ID]
+			VAR _failed =
+			    CALCULATE ( COUNTROWS ( 'DQ Result' ), 'DQ Run'[Run ID] = _run, 'DQ Result'[Status] = "FAIL" )
+			RETURN IF ( [Rules Executed] > 0, _failed + 0 )
+			```
+		formatString: #,##0
+		displayFolder: Rule
+
+	/// Persentase rule yang PASS dari seluruh rule yang dieksekusi pada run terakhir.
+	measure 'Rule Pass Rate' = DIVIDE ( [Rules Passed], [Rules Executed] )
+		formatString: 0.0%
+		displayFolder: Rule
+
+	/// Status gabungan: FAIL jika ada minimal 1 rule gagal pada konteks (rule / dataset / run).
+	measure 'Rule Status' = ```
+			IF (
+			    [Rules Executed] > 0,
+			    IF ( [Rules Failed] > 0, "❌ FAIL", "✅ PASS" )
+			)
+			```
+		displayFolder: Rule
+
+	/// Threshold (minimal Pass %) rule pada run terakhir, sesuai metadata saat run dijalankan.
+	measure Threshold = ```
+			VAR _run = [Latest Run ID]
+			RETURN CALCULATE ( DIVIDE ( MAX ( 'DQ Result'[Threshold Pct] ), 100 ), 'DQ Run'[Run ID] = _run )
+			```
+		formatString: 0.0%
+		displayFolder: Rule
+
+	/// Total record yang divalidasi (dijumlahkan per rule) pada run terakhir.
+	measure 'Records Checked' = ```
+			VAR _run = [Latest Run ID]
+			RETURN CALCULATE ( SUM ( 'DQ Result'[Total Records] ), 'DQ Run'[Run ID] = _run )
+			```
+		formatString: #,##0
+		displayFolder: Record
+
+	/// Total record yang gagal validasi (dijumlahkan per rule) pada run terakhir.
+	measure 'Failed Records' = ```
+			VAR _run = [Latest Run ID]
+			RETURN CALCULATE ( SUM ( 'DQ Result'[Failed Records Count] ), 'DQ Run'[Run ID] = _run )
+			```
+		formatString: #,##0
+		displayFolder: Record
+
+	/// Persentase record gagal dari total record yang divalidasi pada run terakhir.
+	measure 'Failed Record Rate' = DIVIDE ( [Failed Records], [Records Checked] )
+		formatString: 0.00%
+		displayFolder: Record
+
+	column 'Run ID'
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Run_ID
+
+	column 'Rule ID'
+		dataType: string
+		isHidden
+		summarizeBy: none
+		sourceColumn: Rule_ID
+
+	/// Status rule pada run tsb: PASS jika Pass % >= Threshold.
+	column Status
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Status
+
+	column 'Threshold Pct'
+		dataType: double
+		isHidden
+		summarizeBy: none
+		sourceColumn: Threshold
+
+	column 'Total Records'
+		dataType: int64
+		isHidden
+		summarizeBy: none
+		sourceColumn: Total_Records
+
+	column 'Failed Records Count'
+		dataType: int64
+		isHidden
+		summarizeBy: none
+		sourceColumn: Failed_Records
+
+	column 'Pass Pct'
+		dataType: double
+		isHidden
+		summarizeBy: none
+		sourceColumn: Pass_Pct
+
+	partition 'DQ Result' = entity
+		mode: directLake
+		source
+			entityName: dq_results
+			schemaName: dq
+			expressionSource: 'DirectLake - lh_metadata_dq'
+

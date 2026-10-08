@@ -1,0 +1,7 @@
+/// Koneksi Direct Lake ke lakehouse lh_metadata_dq (workspace ws_fabric_metadata_driven_dq)
+expression 'DirectLake - lh_metadata_dq' =
+		let
+		    Source = AzureStorage.DataLake("https://onelake.dfs.fabric.microsoft.com/aa7d44a0-2d4a-48ae-a21e-7ec8316d4fdf/311073e9-f10f-428a-80da-4c33827487aa", [HierarchicalNavigation=true])
+		in
+		    Source
+

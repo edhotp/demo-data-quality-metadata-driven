@@ -1,0 +1,16 @@
+relationship 'DQ Result to DQ Rule'
+	fromColumn: 'DQ Result'.'Rule ID'
+	toColumn: 'DQ Rule'.'Rule ID'
+
+relationship 'DQ Result to DQ Run'
+	fromColumn: 'DQ Result'.'Run ID'
+	toColumn: 'DQ Run'.'Run ID'
+
+relationship 'DQ Error Record to DQ Rule'
+	fromColumn: 'DQ Error Record'.'Rule ID'
+	toColumn: 'DQ Rule'.'Rule ID'
+
+relationship 'DQ Error Record to DQ Run'
+	fromColumn: 'DQ Error Record'.'Run ID'
+	toColumn: 'DQ Run'.'Run ID'
+

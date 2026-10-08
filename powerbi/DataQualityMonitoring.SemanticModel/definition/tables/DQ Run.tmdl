@@ -1,0 +1,44 @@
+/// Dimensi eksekusi DQ Engine (run history): 1 baris = 1 kali eksekusi (sumber: dq.dq_run_history).
+table 'DQ Run'
+
+	/// Jumlah eksekusi DQ Engine.
+	measure 'Run Count' = COUNTROWS ( 'DQ Run' )
+		formatString: #,##0
+
+	/// Rata-rata durasi eksekusi DQ Engine dalam detik.
+	measure 'Average Run Duration' = AVERAGE ( 'DQ Run'[Duration Seconds] )
+		formatString: #,##0.0
+
+	/// ID eksekusi, format RUN_yyyyMMdd_HHmmss (UTC).
+	column 'Run ID'
+		dataType: string
+		isKey
+		summarizeBy: none
+		sourceColumn: Run_ID
+
+	/// Waktu mulai eksekusi (UTC).
+	column 'Start Time'
+		dataType: dateTime
+		formatString: yyyy-mm-dd hh:nn:ss
+		summarizeBy: none
+		sourceColumn: Start_Time
+
+	/// Status eksekusi: COMPLETED atau COMPLETED_WITH_FAILURES (ada rule yang FAIL).
+	column 'Run Status'
+		dataType: string
+		summarizeBy: none
+		sourceColumn: Run_Status
+
+	column 'Duration Seconds'
+		dataType: double
+		isHidden
+		summarizeBy: none
+		sourceColumn: Duration_Sec
+
+	partition 'DQ Run' = entity
+		mode: directLake
+		source
+			entityName: dq_run_history
+			schemaName: dq
+			expressionSource: 'DirectLake - lh_metadata_dq'
+

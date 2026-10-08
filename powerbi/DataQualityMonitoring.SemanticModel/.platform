@@ -1,0 +1,11 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/gitIntegration/platformProperties/2.0.0/schema.json",
+  "metadata": {
+    "type": "SemanticModel",
+    "displayName": "Data Quality Monitoring"
+  },
+  "config": {
+    "version": "2.0",
+    "logicalId": "e8ede54b-0c2c-434c-94de-f6634b2ffad0"
+  }
+}

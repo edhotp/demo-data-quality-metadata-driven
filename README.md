@@ -8,6 +8,7 @@
 | Lakehouse | `lh_metadata_dq` (Lakehouse schemas: `bronze`, `silver`, `gold`, `meta`, `dq`) |
 | Pipeline | `pl_metadata_driven_dq` (01 → 02 → 03) |
 | Notebook | `01_Ingest_Bronze`, `02_DQ_Engine`, `03_Gold_DQ_Dashboard`, `04_Demo_Change_Metadata` |
+| Power BI | Semantic model + report `Data Quality Monitoring` (Direct Lake) |
 
 ## Arsitektur (mengikuti diagram)
 
@@ -101,6 +102,9 @@ flowchart LR
 | [data/dq_rule_catalog.xlsx](data/dq_rule_catalog.xlsx) | **Tabel Metadata (DQ Rule Catalog)** - 12 rule (11 aktif, 1 non-aktif) |
 | [scripts/generate_dummy_data.py](scripts/generate_dummy_data.py) | Generator data dummy & rule catalog |
 | [scripts/deploy_to_fabric.py](scripts/deploy_to_fabric.py) | Deploy otomatis (upload Excel, notebook, pipeline) via Fabric REST API |
+| [scripts/build_report.py](scripts/build_report.py) | Generator report Power BI (PBIR) "Data Quality Monitoring" |
+| [scripts/deploy_powerbi.py](scripts/deploy_powerbi.py) | Deploy semantic model (TMDL, Direct Lake) + report ke workspace |
+| [powerbi/](powerbi/) | Project PBIP: `DataQualityMonitoring.SemanticModel` (TMDL) + `DataQualityMonitoring.Report` (PBIR) |
 | [notebooks/](notebooks/) | Source notebook (`.py` percent-format, mudah dibaca/di-review) + `.ipynb` yang di-deploy |
 
 ## Tabel Metadata (DQ Rule Catalog)
@@ -135,9 +139,43 @@ flowchart LR
 4. **Bahas engine** di `02_DQ_Engine`: satu loop generik + *Rule Library* (1 fungsi per `Rule_Type`).
 5. **Lihat hasil** di `03_Gold_DQ_Dashboard`: Overall DQ Score, DQ Score per Dataset, Rule Validation Detail, Error Record (Quarantine).
 6. **"Aha moment"** - jalankan `04_Demo_Change_Metadata`: aktifkan DQ012, tambah DQ013/DQ014, ubah threshold DQ004 → engine yang **sama** menghasilkan skor berbeda. *Tanpa mengubah kode.*
-7. **(Opsional) Power BI** - di Lakehouse → *New semantic model* → pilih tabel `dq.*` → buat report (gauge Overall DQ Score, bar per dataset, tabel detail rule & error).
+7. **Power BI** - buka report **Data Quality Monitoring** di workspace (lihat bagian [Power BI Report](#power-bi-report-data-quality-monitoring)). Setelah langkah 6, report langsung menampilkan run terbaru (Direct Lake, tanpa import ulang).
 
 > Catatan: notebook `01_Ingest_Bronze` memuat ulang rule catalog dari Excel setiap pipeline jalan. Perubahan via notebook 04 bersifat sementara sampai pipeline berikutnya; untuk perubahan permanen, ubah Excel (atau jadikan tabel `meta.dq_rule_catalog` sebagai *source of truth*).
+
+## Power BI Report: Data Quality Monitoring
+
+Semantic model **Direct Lake** + report PBIR, disimpan sebagai PBIP di [powerbi/](powerbi/) (bisa dibuka di Power BI Desktop via [DataQualityMonitoring.pbip](powerbi/DataQualityMonitoring.pbip)).
+
+```mermaid
+erDiagram
+    "DQ Run" ||--o{ "DQ Result" : "Run ID"
+    "DQ Rule" ||--o{ "DQ Result" : "Rule ID"
+    "DQ Run" ||--o{ "DQ Error Record" : "Run ID"
+    "DQ Rule" ||--o{ "DQ Error Record" : "Rule ID = Error_Code"
+```
+
+| Tabel model | Sumber (lakehouse) | Peran |
+|---|---|---|
+| `DQ Result` | `dq.dq_results` | Fakta hasil per rule per run + measure utama (DQ Score, Rules Passed/Failed, Failed Records, Threshold, Rule Status) |
+| `DQ Error Record` | `dq.dq_error_records` | Fakta record gagal (quarantine) + Error Record Count |
+| `DQ Run` | `dq.dq_run_history` | Dimensi eksekusi (Run ID, Start Time, Run Status) |
+| `DQ Rule` | `meta.dq_rule_catalog` | Dimensi rule dari metadata (Dataset, Column, Rule Type, Severity, Owner, ...) |
+
+Semua measure otomatis memakai **run terakhir** (atau run yang dipilih di slicer *Run ID*), sehingga visual tidak menjumlahkan beberapa run sekaligus.
+
+| Halaman | Isi |
+|---|---|
+| **Ringkasan DQ** | KPI (DQ Score, perubahan vs run sebelumnya, Rules Executed/Passed/Failed, Failed Records), gauge DQ Score vs target 95%, DQ Score per Dataset, tren DQ Score antar run, Rule Validation Detail (PASS/FAIL), Failed Records per Severity |
+| **Error Records (Quarantine)** | Jumlah record dikarantina, record gagal per rule & per owner (siapa yang memperbaiki), detail record gagal + JSON record asli |
+| **DQ Rule Catalog (Metadata)** | Isi metadata rule: jumlah rule per tipe/dataset, rule aktif, parameter, threshold, severity |
+
+Build & deploy ulang:
+
+```powershell
+python scripts/build_report.py      # generate PBIR (powerbi/DataQualityMonitoring.Report) dari kode
+python scripts/deploy_powerbi.py    # deploy semantic model (TMDL) + report ke workspace, lalu refresh model
+```
 
 ## Deploy ulang / dari nol
 
@@ -145,6 +183,7 @@ flowchart LR
 az login                                   # login dengan user yang punya akses ke workspace
 python scripts/generate_dummy_data.py      # (opsional) regenerate data dummy
 python scripts/deploy_to_fabric.py --run   # upload + create/update notebook & pipeline + jalankan pipeline
+python scripts/deploy_powerbi.py           # semantic model + report Power BI
 ```
 
 Workspace dan Lakehouse (`enableSchemas: true`) harus sudah ada (sudah dibuat untuk demo ini).
