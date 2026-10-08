@@ -12,6 +12,7 @@ Usage   : python scripts/deploy_to_fabric.py [--run]
 """
 import base64
 import json
+import os
 import subprocess
 import sys
 import time
@@ -19,8 +20,9 @@ from pathlib import Path
 
 import requests
 
-WORKSPACE_NAME = "ws_fabric_metadata_driven_dq"
-LAKEHOUSE_NAME = "lh_metadata_dq"
+# Nama workspace/lakehouse bisa diganti lewat environment variable (lihat tutorial/README.md)
+WORKSPACE_NAME = os.environ.get("FABRIC_WORKSPACE", "ws_fabric_metadata_driven_dq")
+LAKEHOUSE_NAME = os.environ.get("FABRIC_LAKEHOUSE", "lh_metadata_dq")
 PIPELINE_NAME = "pl_metadata_driven_dq"
 NOTEBOOKS = ["01_Ingest_Bronze", "02_DQ_Engine", "03_Gold_DQ_Dashboard", "04_Demo_Change_Metadata"]
 PIPELINE_STEPS = NOTEBOOKS[:3]  # notebook 04 hanya untuk demo manual

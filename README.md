@@ -2,6 +2,8 @@
 
 > Satu framework untuk banyak dataset, dikendalikan oleh **metadata (konfigurasi)**, tanpa hard-code.
 
+📘 **Ingin mencoba sendiri dari nol?** Ikuti tutorial langkah demi langkah di [tutorial/README.md](tutorial/README.md).
+
 | Item | Nilai |
 |---|---|
 | Workspace | `ws_fabric_metadata_driven_dq` |
@@ -101,11 +103,14 @@ flowchart LR
 | [data/source_data_dummy.xlsx](data/source_data_dummy.xlsx) | Data dummy 4 dataset: Customer (1.000), Sales (5.000), Product (200), Inventory (600) - sengaja berisi error |
 | [data/dq_rule_catalog.xlsx](data/dq_rule_catalog.xlsx) | **Tabel Metadata (DQ Rule Catalog)** - 12 rule (11 aktif, 1 non-aktif) |
 | [scripts/generate_dummy_data.py](scripts/generate_dummy_data.py) | Generator data dummy & rule catalog |
+| [scripts/setup_fabric.py](scripts/setup_fabric.py) | Membuat workspace (di capacity pilihan) + lakehouse dengan schemas aktif |
 | [scripts/deploy_to_fabric.py](scripts/deploy_to_fabric.py) | Deploy otomatis (upload Excel, notebook, pipeline) via Fabric REST API |
 | [scripts/build_report.py](scripts/build_report.py) | Generator report Power BI (PBIR) "Data Quality Monitoring" |
 | [scripts/deploy_powerbi.py](scripts/deploy_powerbi.py) | Deploy semantic model (TMDL, Direct Lake) + report ke workspace |
 | [powerbi/](powerbi/) | Project PBIP: `DataQualityMonitoring.SemanticModel` (TMDL) + `DataQualityMonitoring.Report` (PBIR) |
 | [notebooks/](notebooks/) | Source notebook (`.py` percent-format, mudah dibaca/di-review) + `.ipynb` yang di-deploy |
+| [tutorial/](tutorial/) | Tutorial langkah demi langkah (jalur otomatis & manual via portal) |
+| [requirements.txt](requirements.txt) | Dependensi Python untuk script |
 
 ## Tabel Metadata (DQ Rule Catalog)
 
@@ -181,12 +186,14 @@ python scripts/deploy_powerbi.py    # deploy semantic model (TMDL) + report ke w
 
 ```powershell
 az login                                   # login dengan user yang punya akses ke workspace
+python -m pip install -r requirements.txt
+python scripts/setup_fabric.py --capacity "<nama capacity>"   # workspace + lakehouse (lewati jika sudah ada)
 python scripts/generate_dummy_data.py      # (opsional) regenerate data dummy
 python scripts/deploy_to_fabric.py --run   # upload + create/update notebook & pipeline + jalankan pipeline
 python scripts/deploy_powerbi.py           # semantic model + report Power BI
 ```
 
-Workspace dan Lakehouse (`enableSchemas: true`) harus sudah ada (sudah dibuat untuk demo ini).
+Nama workspace/lakehouse bisa diganti lewat environment variable `FABRIC_WORKSPACE` dan `FABRIC_LAKEHOUSE`.
 
 ## Mengapa Metadata Driven?
 

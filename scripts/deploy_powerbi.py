@@ -9,6 +9,7 @@ Usage: python scripts/deploy_powerbi.py [--model-only]
 """
 import base64
 import json
+import re
 import sys
 import time
 from pathlib import Path
@@ -16,7 +17,7 @@ from pathlib import Path
 import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from deploy_to_fabric import API, FABRIC, WORKSPACE_NAME, call, find, token  # noqa: E402
+from deploy_to_fabric import API, FABRIC, LAKEHOUSE_NAME, WORKSPACE_NAME, call, find, token  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent / "powerbi"
 MODEL_DIR = ROOT / "DataQualityMonitoring.SemanticModel"
@@ -69,8 +70,15 @@ def refresh_model(ws_id, model_id):
 
 def main():
     ws_id = find(call("GET", f"{API}/workspaces")["value"], WORKSPACE_NAME)["id"]
+    lh_id = find(call("GET", f"{API}/workspaces/{ws_id}/lakehouses")["value"], LAKEHOUSE_NAME)["id"]
+
+    # Arahkan koneksi Direct Lake ke workspace & lakehouse tujuan (ID di file TMDL diganti otomatis)
+    expr_path = MODEL_DIR / "definition" / "expressions.tmdl"
+    expr = re.sub(r"onelake\.dfs\.fabric\.microsoft\.com/[0-9a-fA-F-]{36}/[0-9a-fA-F-]{36}",
+                  f"onelake.dfs.fabric.microsoft.com/{ws_id}/{lh_id}", expr_path.read_text(encoding="utf-8"))
+
     print("[1] Semantic model")
-    model_id = upsert(ws_id, "SemanticModel", folder_parts(MODEL_DIR))
+    model_id = upsert(ws_id, "SemanticModel", folder_parts(MODEL_DIR, {"definition/expressions.tmdl": expr}))
     refresh_model(ws_id, model_id)
 
     if "--model-only" not in sys.argv:
